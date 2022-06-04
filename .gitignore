@@ -160,5 +160,5 @@ cython_debug/
 #.idea/
 
 # Windows and macOS
-.DS_Store
+*.DS_Store
 thumbs.db

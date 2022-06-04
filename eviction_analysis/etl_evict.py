@@ -5,7 +5,9 @@ from pathlib import Path
 EVICTION_FULL: str = "https://eviction-lab-data-downloads.s3.amazonaws.com/ets/all_sites_weekly_2020_2021.csv"
 EVICTION_NY: str = "https://evictionlab.org/uploads/newyork_weekly_2020_2021.csv"
 # Fair market rate data: https://www.huduser.gov/portal/datasets/fmr.html
-SMALL_FMR_22: str = "https://www.huduser.gov/portal/datasets/fmr/fmr2022/fy2022_safmrs_revised.xlsx"
+SMALL_FMR_22: str = (
+    "https://www.huduser.gov/portal/datasets/fmr/fmr2022/fy2022_safmrs_revised.xlsx"
+)
 
 # Relative paths
 PKG_DIR: Path = Path(__file__).parent.resolve()
@@ -58,7 +60,7 @@ def load_eviction(path: str, pyarrow: bool = False) -> pd.DataFrame:
     return df
 
 
-def load_fmr(path: str) -> pd.DataFrame:
+def load_fmr(path: str, year: int) -> pd.DataFrame:
     """Load and clean Fair Market Rate data set.
 
     Parameters
@@ -71,15 +73,20 @@ def load_fmr(path: str) -> pd.DataFrame:
     pandas.DataFrame
         Loaded data.
     """
-    # Rename the horrible Excel columns
-    names = ["zipcode", "fmr"]
-    usecols = ["ZIP\nCode", "SAFMR\n2BR"]
+    # I want to use RegEx to match the terrible column names, so I can't use
+    # names and usecols.
+    df: pd.DataFrame = pd.read_excel(path)
 
-    return pd.read_excel(
-        path,
-        names=names,
-        usecols=usecols
-    )
+    # Rename the horrible Excel columns
+    names: List[str] = ["zipcode", "fmr_2br", "fmr_2br_90", "fmr_2br_110"]
+    usecols = df.columns.str.match(r"(SAFMR\n2)|(ZIP)")
+    df: pd.DataFrame = df[usecols]
+    df.columns = names
+
+    # Add in year because we're using multiple FMR data sets
+    df["fmr_year"] = year
+
+    return df
 
 
 def load_zip_city(path: Union[str, Path] = ZIP_TRACT) -> pd.DataFrame:
@@ -87,9 +94,9 @@ def load_zip_city(path: Union[str, Path] = ZIP_TRACT) -> pd.DataFrame:
 
     # Rename zip because it's a keyword and therefore annoying to use.
     # Rename usps-whatever because it's wordy.
-    names: List[str] = ["zipcode", "tract", "city"]
+    names: List[str] = ["zipcode", "tract", "city", "state"]
     # We don't need the rest of the columns
-    usecols: List[str] = ["zip", "tract", "usps_zip_pref_city"]
+    usecols: List[str] = ["zip", "tract", "usps_zip_pref_city", "usps_zip_pref_state"]
 
     zip_tract: pd.DataFrame = pd.read_excel(path, names=names, usecols=usecols)
     # Lower cased city will help with merges
@@ -101,9 +108,17 @@ def merge_evic_fmr(evictions: pd.DataFrame, fmr: pd.DataFrame) -> pd.DataFrame:
     """Write later."""
 
     # Temporary, lower cased city names as well as states to ease merging
-    city_state = evictions.city.str.extract(r"^(\w+), (\w+)$")
+    city_state = evictions.city.str.extract(r"^(\w+),\s(\w+)$")
     city_state.columns = ["temp_city", "temp_state"]
     evictions = pd.concat([evictions, city_state], axis="columns")
 
-    # Zip and census tract data
+    # Zip and census tract data. I want zip codes and tracts to be melted so
+    # that they're associated with each city, state pair.
     zip_tract = load_zip_city()
+    zip_tract = zip_tract.melt(["city", "state"])
+
+    # Fair market data
+    fmr_years = [2020, 2021, 2022]
+    fmr_paths = [
+        DATA_DIR.joinpath(f"fy{year}_safmrs_revised.xlsx") for year in fmr_years
+    ]
