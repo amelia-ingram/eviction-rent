@@ -14,10 +14,10 @@ SMALL_FMR_22: str = (
 PKG_DIR: Path = Path(__file__).parents[1].resolve()
 DATA_DIR: Path = PKG_DIR.joinpath("assets", "data", "raw")
 ZIP_TRACT: Path = DATA_DIR.joinpath("ZIP_TRACT_122021.xlsx")
-EVICTION_REL: Path = DATA_DIR.joinpath("evictions_all_sites_monthly_2020_2021.csv")
+EVICTION_REL: Path = DATA_DIR.joinpath("evictions_allcities_monthly_2020_2021.csv")
 
 
-def load_eviction(path: Union[str, Path] = EVICTION_REL, pyarrow: bool = False) -> pd.DataFrame:
+def load_eviction(path: Union[str, Path] = EVICTION_REL, date_col: str = "month", pyarrow: bool = False) -> pd.DataFrame:
     """Load and clean Eviction Lab data set.
 
     Parameters
@@ -47,7 +47,7 @@ def load_eviction(path: Union[str, Path] = EVICTION_REL, pyarrow: bool = False) 
     # GEOID's missing zip codes are tagged as "sealed" but they should be NaNs.
     na_values: dict[str, str] = {"GEOID": "sealed"}
     # Date columns
-    parse_dates: list[str] = ["last_updated", "week_date"]
+    parse_dates: list[str] = ["last_updated", date_col]
 
     df: pd.DataFrame = pd.read_csv(
         path,
@@ -96,11 +96,10 @@ def load_zip_city(path: Union[str, Path] = ZIP_TRACT) -> pd.DataFrame:
 
     # Rename zip because it's a keyword and therefore annoying to use.
     # Rename usps-whatever because it's wordy.
+    # Also...drop the rest of the columns
     names: List[str] = ["zipcode", "tract", "city", "state"]
-    # We don't need the rest of the columns
-    usecols: List[str] = ["zip", "tract", "usps_zip_pref_city", "usps_zip_pref_state"]
 
-    zip_tract: pd.DataFrame = pd.read_excel(path, names=names, usecols=usecols)
+    zip_tract: pd.DataFrame = pd.read_excel(path, names=names, usecols=names)
     # Lower cased city will help with merges
     zip_tract.city = zip_tract.city.str.lower()
     return zip_tract
