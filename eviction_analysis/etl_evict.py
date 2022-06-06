@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+from typing import Union
 
 # Eviction lab data: https://evictionlab.org/
 EVICTION_FULL: str = "https://eviction-lab-data-downloads.s3.amazonaws.com/ets/all_sites_weekly_2020_2021.csv"
@@ -10,17 +11,18 @@ SMALL_FMR_22: str = (
 )
 
 # Relative paths
-PKG_DIR: Path = Path(__file__).parent.resolve()
-DATA_DIR: Path = PKG_DIR.joinpath("..", "..", "assets", "data", "raw")
+PKG_DIR: Path = Path(__file__).parents[1].resolve()
+DATA_DIR: Path = PKG_DIR.joinpath("assets", "data", "raw")
 ZIP_TRACT: Path = DATA_DIR.joinpath("ZIP_TRACT_122021.xlsx")
+EVICTION_REL: Path = DATA_DIR.joinpath("evictions_all_sites_monthly_2020_2021.csv")
 
 
-def load_eviction(path: str, pyarrow: bool = False) -> pd.DataFrame:
+def load_eviction(path: Union[str, Path] = EVICTION_REL, pyarrow: bool = False) -> pd.DataFrame:
     """Load and clean Eviction Lab data set.
 
     Parameters
     ----------
-    path: str
+    path: [str, Path]
         Path to Eviction Lab data as a CSV.
     pyarrow: bool
         Use Apache Arrow if True. Defaults to False because PyArrow support is
@@ -60,7 +62,7 @@ def load_eviction(path: str, pyarrow: bool = False) -> pd.DataFrame:
     return df
 
 
-def load_fmr(path: str, year: int) -> pd.DataFrame:
+def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
     """Load and clean Fair Market Rate data set.
 
     Parameters
