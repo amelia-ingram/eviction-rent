@@ -94,7 +94,7 @@ def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
     # Rename the horrible Excel columns
     names: List[str] = ["zipcode", "fmr_2br", "fmr_2br_90", "fmr_2br_110"]
     usecols = df.columns.str.match(
-        r"(SAFMR\n2)|(ZIP)|(zcta)|(SAFMR|safmr\s{0,1}\d+\s2br)"
+        r"(\d{0,4}\s{0,1}SAFMR\d{0,4}\n2BR)|(ZIP)|(zcta)|((SAFMR|safmr)\s{0,1}\d{2,4}\s2br)"
     )
 
     # The columns sometimes don't match up because data distributed as
@@ -103,6 +103,9 @@ def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
     logging.debug(f"FMR actual cols: {df.columns}")
     df: pd.DataFrame = df.loc[:, usecols]
     df.columns = names
+
+    # Convert zipcode to Int64 because some of the tracts are null
+    df.zipcode = df.zipcode.astype("Int64")
 
     # Add in year because we're using multiple FMR data sets
     df["fmr_year"] = year
@@ -122,11 +125,13 @@ def load_zip_city(path: Union[str, Path] = ZIP_TRACT) -> pd.DataFrame:
     zip_tract: pd.DataFrame = pd.read_excel(path, names=names, usecols=names)
     # Lower cased city will help with merges
     zip_tract.city = zip_tract.city.str.lower()
+    zip_tract.state = zip_tract.state.str.lower()
     return zip_tract
 
 
 def load_nyc_neighborhoods(path: Union[str, Path] = NYC_BOROUGH) -> pd.DataFrame:
     """Write later"""
+    logging.info(f"Loading New York City neighborhoods data from {path}")
     nyc: pd.DataFrame = pd.read_csv(path)
     nyc.rename(columns={"zip": "zipcode"}, inplace=True)
     return nyc
@@ -135,7 +140,7 @@ def load_nyc_neighborhoods(path: Union[str, Path] = NYC_BOROUGH) -> pd.DataFrame
 def merge_evic_fmr(
     evictions: pd.DataFrame,
     cities: Optional[Union[list[str], str]] = "New York, NY",
-    neighborhoods: Optional[List[pd.DataFrame]] = None,
+    neighborhoods: Optional[list[pd.DataFrame]] = None,
 ) -> pd.DataFrame:
     """Write later."""
     logging.info("Merging data sets into the Eviction Labs DataFrame")
@@ -147,18 +152,21 @@ def merge_evic_fmr(
         cities: list[str] = [cities]
 
     # Likewise for neighborhoods
-    if isinstance(neighborhoods, str):
+    if isinstance(neighborhoods, pd.DataFrame):
         logging.info("Enabled: merging neighborhoods into Eviction Labs")
         neighborhoods: list[pd.DataFrame] = [neighborhoods]
 
     # Filter on cities if requested
     if cities:
         evictions: pd.DataFrame = evictions.loc[evictions.city.isin(cities), :]
+        evictions: pd.DataFrame = evictions.reset_index(drop=True)
 
     # Temporary, lower cased city names as well as states to ease merging
-    city_state: pd.DataFrame = evictions.city.str.extract(r"^(\w+),\s(\w+)$")
-    city_state.columns = ["temp_city", "temp_state"]
-    evictions: pd.DataFrame = pd.concat([evictions, city_state], axis="columns")
+    # city_state: pd.DataFrame = evictions.city.str.extract(r"^([\w\s]+),\s(\w+)$").apply(
+    #    lambda col: col.str.lower()
+    # )
+    # city_state.columns = ["temp_city", "temp_state"]
+    # evictions: pd.DataFrame = pd.concat([evictions, city_state], axis="columns")
 
     # Temporary year column to aid merging
     evictions["temp_year"] = evictions.month.dt.year
@@ -166,48 +174,70 @@ def merge_evic_fmr(
     # Zip and census tract data. I want zip codes and tracts to be melted so
     # that they're associated with each city, state pair.
     zip_tract = load_zip_city()
-    zip_tract = zip_tract.melt(["city", "state"])
+    # zip_tract = zip_tract.melt(["city", "state"], var_name="tabulation", value_name="code")
 
     # Filter on cities again if requested
     if cities:
         # City, State is separated into features for zip_tract so I have to
         # replicate the split to filter
-        city_temp = [city.split(", ") for city in cities]
-        city_zip = [city[0].lower() for city in city_temp]
+        city_temp = [city.lower().split(", ") for city in cities]
+        city_zip = [city[0] for city in city_temp]
         state_zip = [city[1] for city in city_temp]
         zip_tract = zip_tract.loc[
-            zip_tract.city.isin(city_zip) | zip_tract.state.isin(state_zip)
+            zip_tract.city.isin(city_zip) & zip_tract.state.isin(state_zip)
         ]
 
     # Fair market data
-    fmr_years = [2020, 2021, 2022]
-    fmr_paths = [
+    fmr_years: list[int] = [2020, 2021, 2022]
+    fmr_paths: Path = [
         DATA_DIR.joinpath(f"fy{year}_safmrs_revised.xlsx") for year in fmr_years
     ]
-    fmrs = [load_fmr(fmr_path, year) for fmr_path, year in zip(fmr_paths, fmr_years)]
+    fmrs: list[pd.DataFrame] = [
+        load_fmr(fmr_path, year) for fmr_path, year in zip(fmr_paths, fmr_years)
+    ]
 
     # Filter FMRs by zip code if cities were provided
     if cities:
-        fmrs = [fmr.loc[fmr.zipcode.isin(zip_tract.zipcode), :] for fmr in fmrs]
+        fmrs: pd.DataFrame = [
+            fmr.loc[fmr.zipcode.isin(zip_tract.zipcode), :] for fmr in fmrs
+        ]
 
-    # Merge everything
-    evictions = evictions.merge(
-        zip_tract,
-        left_on=["temp_city", "temp_state"],
-        right_on=["city", "state"],
-        how="outer",
-    )
+    # Merge FMR data sets with zipcode/tracts and concat all of the DataFrames
+    fmrs: list[pd.DataFrame] = [
+        fmr.merge(zip_tract, on="zipcode", how="left").melt(
+            ["fmr_2br", "fmr_2br_90", "fmr_2br_110", "fmr_year", "city", "state"],
+            var_name="tabulation",
+            value_name="code",
+        )
+        for fmr in fmrs
+    ]
+    fmrs: pd.DataFrame = pd.concat(fmrs)
 
     # FMRs are merged on zip code and year to produce a long DataFrame where
     # the dates match up
-    for fmr in fmrs:
-        evictions = evictions.merge(fmr, on=["zipcode", "year"], how="left")
+    evictions: pd.DataFrame = evictions.merge(
+        fmrs, left_on=["geoid", "temp_year"], right_on=["code", "fmr_year"], how="left"
+    )
+
+    # Merge neighborhoods data
     if neighborhoods:
         for neighborhood in neighborhoods:
             evictions: pd.DataFrame = evictions.merge(
-                neighborhood, on="zipcode", how="left"
+                neighborhood, left_on="geoid", right_on="zipcode", how="left"
             )
 
     # Final DataFrame without temp columns
-    evictions.drop(columns=["temp_city", "temp_state", "temp_year"], inplace=True)
+    evictions.drop(
+        columns=[
+            "city_y",
+            "code",
+            "fmr_year",
+            "state",
+            "tabulation",
+            "temp_year",
+            "zipcode",
+        ],
+        inplace=True,
+    )
+    evictions.rename(columns={"city_x": "city"}, inplace=True)
     return evictions
