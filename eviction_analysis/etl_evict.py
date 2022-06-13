@@ -29,7 +29,7 @@ def load_eviction(
 
     Parameters
     ----------
-    path: [str, Path]
+    path: Union[str, Path]
         Path to Eviction Lab data as a CSV.
     pyarrow: bool
         Use Apache Arrow if True. Defaults to False because PyArrow support is
@@ -77,7 +77,7 @@ def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
 
     Parameters
     ----------
-    path: str
+    path: Union[str, Path]
         Path to FMR data as an Excel file.
 
     Returns
@@ -93,7 +93,7 @@ def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
 
     # Rename the horrible Excel columns
     names: List[str] = ["zipcode", "fmr_2br", "fmr_2br_90", "fmr_2br_110"]
-    usecols = df.columns.str.match(
+    usecols: pd.Series = df.columns.str.match(
         r"(\d{0,4}\s{0,1}SAFMR\d{0,4}\n2BR)|(ZIP)|(zcta)|((SAFMR|safmr)\s{0,1}\d{2,4}\s2br)"
     )
 
@@ -168,22 +168,21 @@ def merge_evic_fmr(
     # city_state.columns = ["temp_city", "temp_state"]
     # evictions: pd.DataFrame = pd.concat([evictions, city_state], axis="columns")
 
-    # Temporary year column to aid merging
+    # Temporary year column to aid merging with FMR
     evictions["temp_year"] = evictions.month.dt.year
 
-    # Zip and census tract data. I want zip codes and tracts to be melted so
-    # that they're associated with each city, state pair.
-    zip_tract = load_zip_city()
-    # zip_tract = zip_tract.melt(["city", "state"], var_name="tabulation", value_name="code")
+    # Zip and census tract data to filter FMRs and to aid merging FMRs into
+    # the Eviction Labs data set.
+    zip_tract: pd.DataFrame = load_zip_city()
 
     # Filter on cities again if requested
     if cities:
         # City, State is separated into features for zip_tract so I have to
         # replicate the split to filter
-        city_temp = [city.lower().split(", ") for city in cities]
-        city_zip = [city[0] for city in city_temp]
-        state_zip = [city[1] for city in city_temp]
-        zip_tract = zip_tract.loc[
+        city_temp: list[tuple(str, str)] = [city.lower().split(", ") for city in cities]
+        city_zip: list[str] = [city[0] for city in city_temp]
+        state_zip: list[str] = [city[1] for city in city_temp]
+        zip_tract: pd.DataFrame = zip_tract.loc[
             zip_tract.city.isin(city_zip) & zip_tract.state.isin(state_zip)
         ]
 
@@ -203,6 +202,8 @@ def merge_evic_fmr(
         ]
 
     # Merge FMR data sets with zipcode/tracts and concat all of the DataFrames
+    # Melting the DataFrame is primarily so zip codes and census tract are in
+    # one variable to merge on Eviction Labs.
     fmrs: list[pd.DataFrame] = [
         fmr.merge(zip_tract, on="zipcode", how="left").melt(
             ["fmr_2br", "fmr_2br_90", "fmr_2br_110", "fmr_year", "city", "state"],
@@ -240,4 +241,4 @@ def merge_evic_fmr(
         inplace=True,
     )
     evictions.rename(columns={"city_x": "city"}, inplace=True)
-    return evictions
+    return evictions.drop_duplicates()

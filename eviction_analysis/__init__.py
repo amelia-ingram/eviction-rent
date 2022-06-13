@@ -11,7 +11,7 @@ config = {
     "author_email": "amelia.ingram24@qmail.cuny.edu",
     "version": "0.1",
     "install_requires": "NA",
-    "packages": ["pandas", "numpy", "geopandas", "folium"],
+    "packages": ["pandas", "numpy", "geopandas", "folium", "matplotlib", "pyarrow"],
     "scripts": [],
     "name": "eviction_analysis",
 }

@@ -1,7 +1,17 @@
 import pandas as pd
-from etl_evict import EVICTION_FULL, load_eviction
+import etl_evict
 
 if __name__ == "__main__":
-    eviction: pd.DataFrame = load_eviction(EVICTION_FULL)
+    print("Loading data sets to merge")
+    eviction: pd.DataFrame = etl_evict.load_eviction()
+    neighborhoods: pd.DataFrame = etl_evict.load_nyc_neighborhoods()
 
-    print(eviction.head())
+    print("Running merge routine")
+    eviction: pd.DataFrame = etl_evict.merge_evic_fmr(
+        eviction, neighborhoods=neighborhoods
+    )
+
+    print("Saving DataFrame as a Parquet file")
+    eviction.to_parquet(
+        etl_evict.DATA_DIR.parent.joinpath("evict_merged.parquet"), engine="pyarrow"
+    )
