@@ -129,11 +129,36 @@ def load_zip_city(path: Union[str, Path] = ZIP_TRACT) -> pd.DataFrame:
     return zip_tract
 
 
-def load_nyc_neighborhoods(path: Union[str, Path] = NYC_BOROUGH) -> pd.DataFrame:
-    """Write later"""
+def load_nyc_neighborhoods(
+    path: Union[str, Path] = NYC_BOROUGH, pyarrow: bool = True
+) -> pd.DataFrame:
+    """Load New York City neighborhoods data.
+
+    Parameters
+    ----------
+    path: Union[str, Path]
+        Path to betaNYC neighborhoods data. Defaults to a locally cached copy.
+    pyarrow: bool
+        Use Apache Arrow. Defaults to True because PyArrow supports every
+        feature used by this function
+
+    Returns
+    -------
+    pd.DataFrame
+        Loaded betaNYC neighborhoods data.
+    """
     logging.info(f"Loading New York City neighborhoods data from {path}")
-    nyc: pd.DataFrame = pd.read_csv(path)
+
+    dtype: dict[str, str] = {
+        "zip": "Int64",
+        "borough": "category",
+        "post_office": "category",
+        "neighborhood": "category",
+    }
+
+    nyc: pd.DataFrame = pd.read_csv(path, dtype=dtype, engine="pyarrow")
     nyc.rename(columns={"zip": "zipcode"}, inplace=True)
+
     return nyc
 
 
@@ -186,7 +211,7 @@ def merge_evic_fmr(
             zip_tract.city.isin(city_zip) & zip_tract.state.isin(state_zip)
         ]
 
-    # Fair market data
+    # Fair market rate data
     fmr_years: list[int] = [2020, 2021, 2022]
     fmr_paths: Path = [
         DATA_DIR.joinpath(f"fy{year}_safmrs_revised.xlsx") for year in fmr_years
@@ -227,12 +252,13 @@ def merge_evic_fmr(
                 neighborhood, left_on="geoid", right_on="zipcode", how="left"
             )
 
-    # Final DataFrame without temp columns
+    # Final DataFrame without temp/useless columns
     evictions.drop(
         columns=[
             "city_y",
             "code",
             "fmr_year",
+            "last_updated",
             "state",
             "tabulation",
             "temp_year",
@@ -241,4 +267,4 @@ def merge_evic_fmr(
         inplace=True,
     )
     evictions.rename(columns={"city_x": "city"}, inplace=True)
-    return evictions.drop_duplicates()
+    return evictions.drop_duplicates().reset_index(drop=True)
