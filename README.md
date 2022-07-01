@@ -1,14 +1,5 @@
-# eviction-rent
+## Description:
 A group project underway tracking housing eviction rates and fair market housing increases in New York City.
-
-## Our team:
-We are a team of alumni and MA student researchers from CUNY Queens College investigating the relationship between housing eviction rates and rental housing rates in New York City.
-
-+ Amelia Ingram
-+ Joshua Megnauth
-+ Abby Strick
-+ Rameasa Arna
-
 
 ## Our data:
 We are pulling open data on eviction rates from the Eviction Lab and Housing Data Coalition:
@@ -21,3 +12,10 @@ Data on 2022 fair market rents (used to assess section 8 and public housing rate
 https://www.huduser.gov/portal/datasets/fmr.html
 
 \\ This project is currently underway (summer 2022).  Please mind the construction. /
+
+## Build Setup:
+
+# ~TBA~
+
+## Contact:
+If you have any questions regarding the code or setup, please contact amelia.ingram@gmail.com
