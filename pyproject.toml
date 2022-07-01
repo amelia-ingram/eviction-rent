@@ -3,10 +3,12 @@ name = "eviction-rent"
 version = "0.3.0"
 description = "An analysis of evictions during the COVID-19 pandemic."
 keywords = ["data science", "evictions", "polars", "geospatial"]
-authors = ["Amelia Ingram <amelia.ingram24@qmail.cuny.edu>",
-	   "Joshua Megnauth <joshua.megnauth@dontemailme.com>"
-	   "Abby Strick <>"
-	   "Rameasa Arna <>"]
+authors = [
+			"Amelia Ingram <amelia.ingram24@qmail.cuny.edu>",
+			"Joshua Megnauth <joshua.megnauth@dontemailme.com>",
+			"Abby Strick <>",
+			"Rameasa Arna <>"
+			]
 homepage = ""
 license = "GPL-3.0-or-later"
 readme = "README.md"
@@ -14,15 +16,14 @@ repository = "https://github.com/amelia-ingram/eviction-rent"
 include = ["assets"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-arrow = ""
-pandas = "^1.4.2"
-numpy = "^1.23.0"
-matplotlib = "^3.5.2"
-seaborn = "^0.11.2"
-geopandas = "^0.11.0"
-folium = "^0.12.1"
-pyarrow = "^8.0.0"
+python = "3.8"
+pandas = "1.4.2"
+numpy = "1.23.0"
+matplotlib = "3.5.2"
+seaborn = "0.11.2"
+geopandas = "0.11.0"
+folium = "0.12.1"
+pyarrow = "8.0.0"
 
 # Polars is optional
 polars = { version = "^0.13.49", optional = true }
@@ -31,6 +32,7 @@ polars = { version = "^0.13.49", optional = true }
 polars = ["polars"]
 
 [tool.poetry.dev-dependencies]
+black = "22.6.0"
 
 [build-system]
 requires = ["poetry>=0.12"]
