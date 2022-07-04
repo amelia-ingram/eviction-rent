@@ -17,5 +17,3 @@ https://www.huduser.gov/portal/datasets/fmr.html
 
 ###  *TBA
 
-## Contact:
-If you have any questions regarding the code or setup, please contact amelia.ingram@gmail.com
