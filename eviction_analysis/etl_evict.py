@@ -31,6 +31,8 @@ def load_eviction(
     ----------
     path: Union[str, Path]
         Path to Eviction Lab data as a CSV.
+    date_col: str
+        Variable to parse as a date. Defaults to "month."
     pyarrow: bool
         Use Apache Arrow if True. Defaults to False because PyArrow support is
         experimental and thus is missing many features.
@@ -79,13 +81,15 @@ def load_fmr(path: Union[str, Path], year: int) -> pd.DataFrame:
     ----------
     path: Union[str, Path]
         Path to FMR data as an Excel file.
+    year: int
+        Year for path (FMR are issued per year).
 
     Returns
     -------
     pandas.DataFrame
         Loaded data.
     """
-    logging.info(f"Loading {year} Fair Market Rate data from {path}")
+    logging.info(f"Loading {year} Fair Market Rate data from {path}.")
 
     # I want to use RegEx to match the terrible column names, so I can't use
     # names and usecols.
@@ -156,7 +160,9 @@ def load_nyc_neighborhoods(
         "neighborhood": "category",
     }
 
-    nyc: pd.DataFrame = pd.read_csv(path, dtype=dtype, engine="pyarrow")
+    nyc: pd.DataFrame = pd.read_csv(
+        path, dtype=dtype, engine="pyarrow" if pyarrow else None
+    )
     nyc.rename(columns={"zip": "zipcode"}, inplace=True)
 
     return nyc
@@ -267,4 +273,5 @@ def merge_evic_fmr(
         inplace=True,
     )
     evictions.rename(columns={"city_x": "city"}, inplace=True)
+    evictions.geoid = evictions.geoid.astype("category")
     return evictions.drop_duplicates().reset_index(drop=True)
